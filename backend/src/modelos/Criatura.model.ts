@@ -16,6 +16,14 @@ export interface ICriatura extends Document {
   habilidades: string[];
   nivelPeligro: number;
   estado: EstadoInvestigacion;
+  especie?: string;
+  rareza?: string;
+  habitat?: string;
+  elemento?: string;
+  personalidad?: string;
+  debilidad?: string;
+  descripcion?: string;
+  historia?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +51,14 @@ const CriaturaSchema = new Schema<ICriatura>(
       enum: ["activa", "en_investigacion", "descartada"],
       default: "activa",
     },
+    especie: { type: String, trim: true },
+    rareza: { type: String, trim: true },
+    habitat: { type: String, trim: true },
+    elemento: { type: String, trim: true },
+    personalidad: { type: String, trim: true },
+    debilidad: { type: String, trim: true },
+    descripcion: { type: String, trim: true },
+    historia: { type: String, trim: true },
   },
   { timestamps: true }
 );
