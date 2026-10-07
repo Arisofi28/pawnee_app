@@ -11,7 +11,7 @@ export async function generarCriatura(answers: CreatureAnswers): Promise<Generat
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? `Creature generation failed (HTTP ${response.status}).`);
+    throw new Error(body.error ?? `No se pudo crear la criatura (HTTP ${response.status}).`);
   }
 
   return response.json() as Promise<GeneratedCreature>;

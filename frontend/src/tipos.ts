@@ -17,6 +17,14 @@ export interface Criatura {
   habilidades: string[];
   nivelPeligro: number;
   estado: EstadoInvestigacion;
+  especie?: string;
+  rareza?: string;
+  habitat?: string;
+  elemento?: string;
+  personalidad?: string;
+  debilidad?: string;
+  descripcion?: string;
+  historia?: string;
   createdAt: string;
   updatedAt: string;
 }

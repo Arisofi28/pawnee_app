@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { generarCriatura } from "../../api/generarCriaturaApi";
+import { crearCriatura } from "../../api/criaturasApi";
+import { CriaturaFormulario, TipoCriatura } from "../../tipos";
 import {
   ABILITIES,
   CreatureAnswers,
@@ -12,15 +14,65 @@ import {
 import "./generadorCriatura.css";
 
 const QUESTIONS = [
-  { key: "habitat", title: "Where would your creature live?", options: HABITATS },
-  { key: "element", title: "What kind of energy does it have?", options: ELEMENTS },
-  { key: "personality", title: "How would you describe its personality?", options: PERSONALITIES },
-  { key: "ability", title: "What ability should it have?", options: ABILITIES },
-  { key: "rarity", title: "How unusual do you want it to be?", options: RARITIES },
+  { key: "habitat", title: "¿Dónde viviría tu criatura?", options: HABITATS },
+  { key: "element", title: "¿Qué tipo de energía tiene?", options: ELEMENTS },
+  { key: "personality", title: "¿Cómo describirías su personalidad?", options: PERSONALITIES },
+  { key: "ability", title: "¿Qué habilidad debería tener?", options: ABILITIES },
+  { key: "rarity", title: "¿Qué tan inusual quieres que sea?", options: RARITIES },
 ] as const;
 
+const OPTION_LABELS: Record<string, string> = {
+  Forest: "Bosque",
+  Mountains: "Montañas",
+  City: "Ciudad",
+  Water: "Agua",
+  Desert: "Desierto",
+  "Another world": "Otro mundo",
+  Fire: "Fuego",
+  Nature: "Naturaleza",
+  Light: "Luz",
+  Darkness: "Oscuridad",
+  Electricity: "Electricidad",
+  Curious: "Curiosa",
+  Protective: "Protectora",
+  Rebellious: "Rebelde",
+  Shy: "Tímida",
+  Chaotic: "Caótica",
+  Wise: "Sabia",
+  "Read minds": "Leer la mente",
+  "Control time": "Controlar el tiempo",
+  "Become invisible": "Volverse invisible",
+  "Create illusions": "Crear ilusiones",
+  Heal: "Curar",
+  Transform: "Transformarse",
+  Common: "Común",
+  Rare: "Rara",
+  Epic: "Épica",
+  Legendary: "Legendaria",
+};
+
 const EMPTY_ANSWERS: Partial<CreatureAnswers> = {};
-const STORAGE_KEY = "pawnee-saved-creatures";
+
+function datosParaGuardar(creature: GeneratedCreature): CriaturaFormulario {
+  const tipo: TipoCriatura = ["Light", "Darkness"].includes(creature.element) ? "espectral" : "elemental";
+  const nivelPeligro = { Common: 2, Rare: 4, Epic: 7, Legendary: 10 }[creature.rarity];
+
+  return {
+    nombre: creature.name,
+    tipo,
+    habilidades: [OPTION_LABELS[creature.ability] ?? creature.ability],
+    nivelPeligro,
+    estado: "activa",
+    especie: creature.species,
+    rareza: OPTION_LABELS[creature.rarity] ?? creature.rarity,
+    habitat: OPTION_LABELS[creature.habitat] ?? creature.habitat,
+    elemento: OPTION_LABELS[creature.element] ?? creature.element,
+    personalidad: OPTION_LABELS[creature.personality] ?? creature.personality,
+    debilidad: creature.weakness,
+    descripcion: creature.description,
+    historia: creature.lore,
+  };
+}
 
 export function GeneradorCriatura() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,6 +81,8 @@ export function GeneradorCriatura() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [creature, setCreature] = useState<GeneratedCreature | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [message, setMessage] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -55,6 +109,7 @@ export function GeneradorCriatura() {
     setAnswers(EMPTY_ANSWERS);
     setQuestionIndex(0);
     setCreature(null);
+    setIsSaved(false);
     setMessage("");
   }
 
@@ -65,39 +120,52 @@ export function GeneradorCriatura() {
     setIsGenerating(true);
     setMessage("");
     try {
-      setCreature(await generarCriatura(completeAnswers));
+      const generated = await generarCriatura(completeAnswers);
+      setCreature(generated);
       setStage("result");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The creature could not be created. Please try again.");
+      setMessage(error instanceof Error ? error.message : "No se pudo crear la criatura. Inténtalo de nuevo.");
     } finally {
       setIsGenerating(false);
     }
   }
 
-  function saveCreature() {
-    if (!creature) return;
+  async function saveToAtlas(creatureToSave: GeneratedCreature) {
+    setIsSaving(true);
+    setMessage("");
+
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]") as GeneratedCreature[];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...saved, creature]));
-      setMessage(`${creature.name} was saved in this browser.`);
-    } catch {
-      setMessage("This creature could not be saved. Check your browser storage settings and try again.");
+      const savedCreature = await crearCriatura(datosParaGuardar(creatureToSave));
+      if (!savedCreature?._id) {
+        throw new Error("El servidor no confirmó el registro de la criatura en la base de datos.");
+      }
+      setIsSaved(true);
+      setMessage(`${creatureToSave.name} se guardó en el archivo de Pawnee.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo guardar la criatura. Inténtalo de nuevo.");
+    } finally {
+      setIsSaving(false);
     }
+  }
+
+  function saveCreature() {
+    if (creature && !isSaved && !isSaving) void saveToAtlas(creature);
   }
 
   const currentQuestion = QUESTIONS[questionIndex];
   const selectedAnswer = currentQuestion ? answers[currentQuestion.key] : undefined;
+  const creatureData = creature ? datosParaGuardar(creature) : null;
 
   return (
     <>
       <section className="creature-generator__promo" aria-labelledby="creature-generator-title">
         <div>
-          <span className="creature-generator__eyebrow">FIELD NOTE · PERSONAL ENCOUNTER</span>
-          <h2 id="creature-generator-title">A creature of your own</h2>
-          <p>Answer a few questions and find out which creature lives alongside you.</p>
+          <span className="creature-generator__eyebrow">NOTA DE CAMPO · ENCUENTRO PERSONAL</span>
+          <h2 id="creature-generator-title">Una criatura propia</h2>
+          <p>Responde unas preguntas y descubre qué criatura vive a tu lado.</p>
         </div>
         <button ref={triggerRef} type="button" onClick={() => { startOver(); setIsOpen(true); }}>
-          Discover Your Own Creature
+          Descubre tu propia criatura
         </button>
       </section>
 
@@ -120,24 +188,24 @@ export function GeneradorCriatura() {
               className="creature-generator__close"
               type="button"
               onClick={() => setIsOpen(false)}
-              aria-label="Close creature discovery"
+              aria-label="Cerrar el descubrimiento de criaturas"
             >
               ×
             </button>
 
             {stage === "intro" && (
               <div className="creature-generator__intro">
-                <span className="creature-generator__eyebrow">PAWNEE FIELD ARCHIVE · ENCOUNTER 01</span>
-                <h2 id="creature-generator-dialog-title">Discover Your Own Creature</h2>
-                <p>Every creature in Pawnee is different. Answer a few questions and discover which one lives alongside you.</p>
-                <button type="button" onClick={() => setStage("quiz")}>Start</button>
+                <span className="creature-generator__eyebrow">ARCHIVO DE CAMPO DE PAWNEE · ENCUENTRO 01</span>
+                <h2 id="creature-generator-dialog-title">Descubre tu propia criatura</h2>
+                <p>Cada criatura de Pawnee es diferente. Responde unas preguntas y descubre cuál vive a tu lado.</p>
+                <button type="button" onClick={() => setStage("quiz")}>Comenzar</button>
               </div>
             )}
 
             {stage === "quiz" && currentQuestion && (
               <section className="creature-generator__quiz" aria-labelledby="creature-generator-dialog-title">
                 <div className="creature-generator__progress">
-                  <span>QUESTION {questionIndex + 1} / {QUESTIONS.length}</span>
+                  <span>PREGUNTA {questionIndex + 1} / {QUESTIONS.length}</span>
                   <div><span style={{ width: `${((questionIndex + 1) / QUESTIONS.length) * 100}%` }} /></div>
                 </div>
                 <h2 id="creature-generator-dialog-title">{currentQuestion.title}</h2>
@@ -154,22 +222,22 @@ export function GeneradorCriatura() {
                       }}
                     >
                       <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                      {option}
+                      {OPTION_LABELS[option] ?? option}
                     </button>
                   ))}
                 </div>
                 {message && <p className="creature-generator__message" role="alert">{message}</p>}
                 <div className="creature-generator__controls">
                   <button type="button" className="is-secondary" disabled={questionIndex === 0} onClick={() => setQuestionIndex(questionIndex - 1)}>
-                    Back
+                    Anterior
                   </button>
                   {questionIndex < QUESTIONS.length - 1 ? (
                     <button type="button" disabled={!selectedAnswer} onClick={() => setQuestionIndex(questionIndex + 1)}>
-                      Next
+                      Siguiente
                     </button>
                   ) : (
                     <button type="button" disabled={!selectedAnswer || isGenerating} onClick={createCreature}>
-                      {isGenerating ? "Creating..." : "Create My Creature"}
+                      {isGenerating ? "Creando..." : "Crear mi criatura"}
                     </button>
                   )}
                 </div>
@@ -178,27 +246,33 @@ export function GeneradorCriatura() {
 
             {stage === "result" && creature && (
               <section className="creature-generator__result" aria-labelledby="creature-generator-dialog-title">
-                <span className="creature-generator__eyebrow">FIELD ARCHIVE · NEW ENCOUNTER</span>
+                <span className="creature-generator__eyebrow">ARCHIVO DE CAMPO · NUEVO ENCUENTRO</span>
                 <div className="creature-generator__card">
                   <div className="creature-generator__card-heading">
-                    <span className="creature-generator__rarity">{creature.rarity}</span>
+                    <span className="creature-generator__rarity">{OPTION_LABELS[creature.rarity]}</span>
                     <h2 id="creature-generator-dialog-title">{creature.name}</h2>
                     <p>{creature.species}</p>
                   </div>
                   <p className="creature-generator__description">{creature.description}</p>
                   <dl>
-                    <div><dt>Habitat</dt><dd>{creature.habitat}</dd></div>
-                    <div><dt>Element</dt><dd>{creature.element}</dd></div>
-                    <div><dt>Personality</dt><dd>{creature.personality}</dd></div>
-                    <div><dt>Ability</dt><dd>{creature.ability}</dd></div>
-                    <div><dt>Weakness</dt><dd>{creature.weakness}</dd></div>
+                    <div><dt>Nombre</dt><dd>{creature.name}</dd></div>
+                    <div><dt>Tipo</dt><dd>{creatureData?.tipo === "espectral" ? "Espectral" : "Elemental"}</dd></div>
+                    <div><dt>Habilidades</dt><dd>{OPTION_LABELS[creature.ability] ?? creature.ability}</dd></div>
+                    <div><dt>Nivel de peligro</dt><dd>{creatureData?.nivelPeligro} / 10</dd></div>
+                    <div><dt>Estado</dt><dd>Activa</dd></div>
+                    <div><dt>Hábitat</dt><dd>{OPTION_LABELS[creature.habitat]}</dd></div>
+                    <div><dt>Elemento</dt><dd>{OPTION_LABELS[creature.element] ?? creature.element}</dd></div>
+                    <div><dt>Personalidad</dt><dd>{OPTION_LABELS[creature.personality] ?? creature.personality}</dd></div>
+                    <div><dt>Debilidad</dt><dd>{creature.weakness}</dd></div>
                   </dl>
                   <blockquote>{creature.lore}</blockquote>
                 </div>
-                {message && <p className="creature-generator__message" role="status">{message}</p>}
+                {message && <p className="creature-generator__message" role={isSaved ? "status" : "alert"}>{message}</p>}
                 <div className="creature-generator__controls">
-                  <button type="button" className="is-secondary" onClick={startOver}>Create Another Creature</button>
-                  <button type="button" onClick={saveCreature}>Save Creature</button>
+                  <button type="button" className="is-secondary" disabled={isSaving} onClick={startOver}>Crear otra criatura</button>
+                  <button type="button" onClick={saveCreature} disabled={isSaving || isSaved}>
+                    {isSaving ? "Guardando..." : isSaved ? "Guardada en Atlas" : "Guardar criatura"}
+                  </button>
                 </div>
               </section>
             )}
