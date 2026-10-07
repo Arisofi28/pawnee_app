@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { obtenerCriaturas } from "../api/criaturasApi";
+import { GeneradorCriatura } from "../componentes/GeneradorCriatura/GeneradorCriatura";
 import { Criatura, TipoCriatura, TIPOS_CRIATURA } from "../tipos";
 
 export function ListaCriaturas() {
@@ -38,6 +39,8 @@ export function ListaCriaturas() {
         {" · "}
         <Link to="/avistamientos">Ver avistamientos</Link>
       </p>
+
+      <GeneradorCriatura />
 
       <label htmlFor="filtro-tipo">Filtrar por tipo: </label>
       <select

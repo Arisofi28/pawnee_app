@@ -12,6 +12,7 @@ import { logger } from "./middlewares/logger";
 import { errorHandler } from "./middlewares/errorHandler";
 import { criaturasRouter } from "./routes/criaturas.routes";
 import { avistamientosRouter } from "./routes/avistamientos.routes";
+import { generarCriaturaRouter } from "./routes/generarCriatura.routes";
 import { ApiError } from "./apiError";
 
 export function crearApp(): Express {
@@ -28,6 +29,7 @@ export function crearApp(): Express {
 
   app.use("/api/criaturas", criaturasRouter);
   app.use("/api/avistamientos", avistamientosRouter);
+  app.use("/api/generate-creature", generarCriaturaRouter);
 
   app.use((req: Request, res: Response, next) => {
     next(new ApiError(404, `Ruta no encontrada: ${req.method} ${req.originalUrl}`));
